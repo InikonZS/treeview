@@ -1,16 +1,17 @@
 import Control from '../common/control';
 import {DataHolder, ICategoryData, IWordData} from './dataHolder';
 import {TreeEditorView, TreeEditorModel, initialTree} from './treeEditor';
-
+import {Canvas} from './canvas/canvas';
 export class Application extends Control{
   constructor(parentNode:HTMLElement){
     super(parentNode);
     const hello = new Control(this.node, 'div', '', 'hello');
 
-    const treeEditorModel = new TreeEditorModel();
+    const canvas = new Canvas(this.node);
+    /*const treeEditorModel = new TreeEditorModel();
     const treeEditorView = new TreeEditorView(this.node, treeEditorModel);
     treeEditorModel.setData(initialTree);
-    treeEditorView.update(initialTree);
+    treeEditorView.update(initialTree);*/
 
    /* const preloaderView = new Control(this.node);
     preloaderView.node.textContent = 'loading...';
