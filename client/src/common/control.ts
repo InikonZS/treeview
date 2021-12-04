@@ -1,10 +1,10 @@
-class Control<NodeType extends HTMLElement = HTMLElement>{
+class Control<NodeType extends HTMLElement | SVGElement = HTMLElement>{
   public node: NodeType;
 
-  constructor(parentNode: HTMLElement | null, tagName = 'div', className = '', content = '') {
+  constructor(parentNode: HTMLElement | SVGElement | null, tagName = 'div', className = '', content = '') {
     const el = document.createElement(tagName);
     el.className = className;
-    el.textContent = content;
+    el.innerHTML = content;
     if (parentNode) {
       parentNode.append(el);
     }
