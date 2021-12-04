@@ -429,6 +429,7 @@ function parsePath(_path:string):Array<{tag:string, args:Array<number>}>{
 }
 
 class Sview extends Control{
+  editable: SVGPathElement;
   constructor(parentNode:HTMLElement){
     super(parentNode, 'div', '', `
     <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
@@ -451,9 +452,14 @@ class Sview extends Control{
     </g>
     </svg>
    `);
+
+   this.node.style.width = '822.000000px'; 
+   this.node.style.height = '1280.000000px';
+
+   this.editable = this.node.querySelector<SVGPathElement>('.a');
   }
 
-  addPoint(px:number, py: number){
+  addPoint(px:number, py: number, onMove:(x:number, y:number)=>void){
     let main = this.node.querySelector<SVGGElement>('.all_image');
     //let circle = new Control<SVGCircleElement>(main, 'circle');
     let circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -461,6 +467,27 @@ class Sview extends Control{
     circle.setAttribute('cy', py.toString());
     circle.setAttribute('r', 40..toString());
     circle.setAttribute('fill', 'red');
+
+    let isDrag = false;
+    circle.onmousedown = (ev)=>{
+      isDrag = true;
+
+      this.node.onmousemove = (ev)=>{
+        console.log(ev.clientY);
+        circle.setAttribute('cx', ((ev.clientX)*10 ).toString());
+        circle.setAttribute('cy', ((ev.clientY-1280)* -10 ).toString());  
+        onMove((ev.clientX)*10, (ev.clientY-1280)* -10);
+      }
+
+      this.node.onmouseup = (ev)=>{
+        isDrag = false;
+        this.node.onmouseup = null;
+        this.node.onmousemove = null;
+      }
+    }
+
+    
+
     main.append(circle);
   }
 }
@@ -469,13 +496,69 @@ let sv = new Sview(document.body);
 //sv.addPoint(3363, 12652);
 
 
+function toAbsolute(data:Array<{tag:string, args:Array<number>}>):Array<{tag:string, args:Array<number>}>{
+  let lx = 0;
+  let ly = 0;
+  let res1: Array<{tag:string, args:Array<number>}> = [];
+  data.forEach(it=>{
+    let rec:{tag:string, args:Array<number>} = {
+      tag:it.tag.toUpperCase(),
+      args: []
+    }
+    res1.push(rec);
+    if (it.tag=='c'){
+      console.log(rec);
+      for (let i = 0; i< 3; i++){
+        rec.args.push(it.args[0 + i*2]+lx);
+        rec.args.push(it.args[1+ i*2]+ly);
+        if (i==2){
+        lx = it.args[0+ i*2]+lx;
+        ly = it.args[1+ i*2]+ly;
+      }
+        //
+      }
+    } else {
+      rec.args.push(it.args[0]);
+      rec.args.push(it.args[1]);
+      lx = it.args[0]+lx;
+      ly = it.args[1]+ly;
+    }
+  });
+  return res1;
+}
+
 let res = parsePath(path);
-let lx = 0;
+let ab = toAbsolute(res);
+console.log(ab);
+ab.forEach(it=>{
+  console.log(it)
+  if (it.tag=='C'){
+    for (let i = 0; i< 3; i++){
+      sv.addPoint(it.args[0 + i*2], it.args[1+ i*2], (x,y)=>{
+        it.args[0 + i*2] = x;
+        it.args[1+ i*2] = y;
+        sv.editable.setAttribute('d', unParse(ab));
+      });
+    }
+      //
+  } else {
+
+  }
+});
+
+
+/*let lx = 0;
 let ly = 0;
 res.forEach(it=>{
   if (it.tag=='c'){
     for (let i = 0; i< 3; i++){
-      sv.addPoint(it.args[0 + i*2]+lx, it.args[1+ i*2]+ly);
+      let cllx = lx;
+      let clly = ly;
+      sv.addPoint(it.args[0 + i*2]+lx, it.args[1+ i*2]+ly, (x,y)=>{
+        it.args[0 + i*2] = x-cllx;
+        it.args[1+ i*2] = y-clly;
+        sv.editable.setAttribute('d', unParse(res));
+      });
       if (i==2){
       lx = it.args[0+ i*2]+lx;
       ly = it.args[1+ i*2]+ly;
@@ -486,5 +569,13 @@ res.forEach(it=>{
     lx = it.args[0]+lx;
     ly = it.args[1]+ly;
   }
-});
+});*/
 console.log(res);
+
+function unParse(data:Array<{tag:string, args:Array<number>}>):string{
+  let res = '';
+  data.forEach(it=>{
+    res+=it.tag+it.args.join(' ');  
+  }); 
+  return res; 
+}
