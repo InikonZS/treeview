@@ -5,7 +5,9 @@
     "module": "es2020",
     "target": "es2020",
     "allowJs": true,
-    "outDir": "./js"
+    "outDir": "./js",
+    "moduleResolution": "node",
+    "sourceMap": true
   },
-  "files": ["src/index.ts"]
+  "files": ["src/index.ts", "./module.d.ts"]
 }
