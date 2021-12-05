@@ -2,12 +2,14 @@ import Control from '../common/control';
 import {DataHolder, ICategoryData, IWordData} from './dataHolder';
 import {TreeEditorView, TreeEditorModel, initialTree} from './treeEditor';
 import {Canvas} from './canvas/canvas';
+import {SEditor} from './svg/sview';
 export class Application extends Control{
   constructor(parentNode:HTMLElement){
     super(parentNode);
     const hello = new Control(this.node, 'div', '', 'hello');
 
-    const canvas = new Canvas(this.node);
+    const seditor = new SEditor(this.node);
+    //const canvas = new Canvas(this.node);
     /*const treeEditorModel = new TreeEditorModel();
     const treeEditorView = new TreeEditorView(this.node, treeEditorModel);
     treeEditorModel.setData(initialTree);

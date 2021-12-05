@@ -336,6 +336,7 @@ class TriangleShape extends BaseShape {
   }
 }
 
+/*
 const path = `M3362 12652 c-13 -601 -227 -1121 -671 -1630 -129 -149 -235 -255
 -566 -567 -447 -422 -581 -563 -741 -775 -194 -257 -321 -513 -393 -793 -83
 -323 -82 -757 4 -1153 30 -137 29 -124 8 -124 -44 0 -127 66 -259 205 -190
@@ -459,14 +460,14 @@ class Sview extends Control{
    this.editable = this.node.querySelector<SVGPathElement>('.a');
   }
 
-  addPoint(px:number, py: number, onMove:(x:number, y:number)=>void){
+  addPoint(px:number, py: number, color:string, onMove:(x:number, y:number)=>void){
     let main = this.node.querySelector<SVGGElement>('.all_image');
     //let circle = new Control<SVGCircleElement>(main, 'circle');
     let circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('cx', px.toString());
     circle.setAttribute('cy', py.toString());
     circle.setAttribute('r', 40..toString());
-    circle.setAttribute('fill', 'red');
+    circle.setAttribute('fill', color);
 
     let isDrag = false;
     circle.onmousedown = (ev)=>{
@@ -534,7 +535,7 @@ ab.forEach(it=>{
   console.log(it)
   if (it.tag=='C'){
     for (let i = 0; i< 3; i++){
-      sv.addPoint(it.args[0 + i*2], it.args[1+ i*2], (x,y)=>{
+      sv.addPoint(it.args[0 + i*2], it.args[1+ i*2], i==2? 'green':'red', (x,y)=>{
         it.args[0 + i*2] = x;
         it.args[1+ i*2] = y;
         sv.editable.setAttribute('d', unParse(ab));
@@ -570,7 +571,7 @@ res.forEach(it=>{
     ly = it.args[1]+ly;
   }
 });*/
-console.log(res);
+/*console.log(res);
 
 function unParse(data:Array<{tag:string, args:Array<number>}>):string{
   let res = '';
@@ -579,3 +580,4 @@ function unParse(data:Array<{tag:string, args:Array<number>}>):string{
   }); 
   return res; 
 }
+*/
