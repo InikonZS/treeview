@@ -105,6 +105,51 @@ export class SEditor extends Control{
   }
 }
 
+export class SRect {
+  startPoint: DOMPoint;
+  endPoint: DOMPoint;
+  node: SVGRectElement;
+  mtx: DOMMatrix;
+
+  constructor(parentNode:SVGSVGElement, sx:number, sy:number){
+    this.mtx = DOMMatrix.fromMatrix(parentNode.getScreenCTM()).inverse();
+    this.startPoint = this.mtx.transformPoint(new DOMPoint(sx, sy));
+    this.endPoint = this.startPoint;
+    let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.style.stroke = '#000';
+    rect.style.fill = '#0004';
+    rect.setAttribute('x', pixel(this.startPoint.x));
+    rect.setAttribute('y', pixel(this.startPoint.y));
+    rect.setAttribute('width', pixel(0));
+    rect.setAttribute('height', pixel(0));
+    parentNode.appendChild(rect);
+    this.node = rect;
+  }
+
+  resize(ex:number, ey:number){
+    const rect = this.node;
+    this.endPoint = this.mtx.transformPoint(new DOMPoint(ex, ey));
+    rect.setAttribute('width', pixel(Math.abs(this.endPoint.x - this.startPoint.x)));
+    rect.setAttribute('height', pixel(Math.abs(this.endPoint.y - this.startPoint.y)));
+
+    if (this.endPoint.x - this.startPoint.x < 0) {
+      rect.setAttribute('x', pixel(this.endPoint.x));
+    } else {
+      rect.setAttribute('x', pixel(this.startPoint.x));
+    }
+
+    if (this.endPoint.y - this.startPoint.y < 0) {
+      rect.setAttribute('y', pixel(this.endPoint.y));
+    } else {
+      rect.setAttribute('y', pixel(this.startPoint.y));
+    }
+  }
+
+  destroy(){
+    this.node.remove();
+  }
+}
+
 export class SView extends Control {
   editables: SVGPathElement[];
   svg: SVGElement;
@@ -119,10 +164,11 @@ export class SView extends Control {
     this.svg = this.node.querySelector<SVGElement>('svg');
 
 
-    let startPoint: DOMPoint;
-    let endPoint: DOMPoint;
+    //let startPoint: DOMPoint;
+    //let endPoint: DOMPoint;
     this.svg.onmousedown = (ev)=>{
-      let mtx = DOMMatrix.fromMatrix((this.svg as SVGSVGElement).getScreenCTM()).inverse();
+      const rect = new SRect(this.svg as SVGSVGElement, ev.clientX, ev.clientY);
+      /*let mtx = DOMMatrix.fromMatrix((this.svg as SVGSVGElement).getScreenCTM()).inverse();
       startPoint = mtx.transformPoint(new DOMPoint(ev.clientX, ev.clientY));
       endPoint = startPoint;
       let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -133,9 +179,10 @@ export class SView extends Control {
       rect.setAttribute('width', pixel(0));
       rect.setAttribute('height', pixel(0));
       this.svg.appendChild(rect);
-
+*/
       this.svg.onmousemove = (ev)=>{
-        endPoint = mtx.transformPoint(new DOMPoint(ev.clientX, ev.clientY));
+        rect.resize(ev.clientX, ev.clientY);
+       /* endPoint = mtx.transformPoint(new DOMPoint(ev.clientX, ev.clientY));
         rect.setAttribute('width', pixel(Math.abs(endPoint.x - startPoint.x)));
         rect.setAttribute('height', pixel(Math.abs(endPoint.y - startPoint.y)));
 
@@ -148,18 +195,21 @@ export class SView extends Control {
         if (endPoint.y - startPoint.y < 0) {
           rect.setAttribute('y', pixel(endPoint.y));
         } else {
-          rect.setAttribute('y', pixel(startPoint.y));
-        }
+          rect.setAttribute('y', pixel(startPoint.y));*/
+       // }
       }
 
       this.svg.onmouseup = (ev)=>{
         this.svg.onmousemove = null;
         this.svg.onmouseup = null;
-        rect.remove();
+       
+        //rect.remove();
         this.markers.forEach(it=> it.unselect());
-        let selected = this.selectMarkers(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+        let selected = this.selectMarkers(rect.startPoint.x, rect.startPoint.y, rect.endPoint.x, rect.endPoint.y);
         selected.forEach(it=>it.select());
-        this.selected = selected;
+        this.selected = selected; 
+        
+        rect.destroy();
         //selected.forEach()
       }
 
