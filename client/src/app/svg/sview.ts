@@ -83,10 +83,20 @@ export class SEditor extends Control{
           ay = it.args[1+ i*2]; 
         }
         
-        this.sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(it.tag)/2-1? 'green':'red', (x,y)=>{
+        this.sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(it.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
           it.args[0 + i*2] = x;
           it.args[1 + i*2] = y;
+          
           editable.setAttribute('d', unParse(ab));
+        },
+        (x,y, lastx, lasty)=>{
+          console.log(x,y, lastx, lasty);
+          this.sview.selected.forEach(point=>{
+            point.onMove(point.x - lastx + x, point.y - lasty + y, point.x, point.y);
+            point.x = point.x - lastx + x;
+            point.y = point.y - lasty + y;
+            
+          });
         });
         lx = it.args[0 + i*2];
         ly = it.args[1 + i*2];
@@ -99,13 +109,62 @@ export class SView extends Control {
   editables: SVGPathElement[];
   svg: SVGElement;
   markers: Array<SMarker> = [];
+  selected: Array<SMarker> = [];
 
   constructor(parentNode: HTMLElement, svgCode:string) {
     super(parentNode, 'div', '',);
 
    this.node.innerHTML = svgCode;
 
-    this.svg = this.node.querySelector<SVGSVGElement>('svg');
+    this.svg = this.node.querySelector<SVGElement>('svg');
+
+
+    let startPoint: DOMPoint;
+    let endPoint: DOMPoint;
+    this.svg.onmousedown = (ev)=>{
+      let mtx = DOMMatrix.fromMatrix((this.svg as SVGSVGElement).getScreenCTM()).inverse();
+      startPoint = mtx.transformPoint(new DOMPoint(ev.clientX, ev.clientY));
+      endPoint = startPoint;
+      let rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.style.stroke = '#000';
+      rect.style.fill = '#0004';
+      rect.setAttribute('x', pixel(startPoint.x));
+      rect.setAttribute('y', pixel(startPoint.y));
+      rect.setAttribute('width', pixel(0));
+      rect.setAttribute('height', pixel(0));
+      this.svg.appendChild(rect);
+
+      this.svg.onmousemove = (ev)=>{
+        endPoint = mtx.transformPoint(new DOMPoint(ev.clientX, ev.clientY));
+        rect.setAttribute('width', pixel(Math.abs(endPoint.x - startPoint.x)));
+        rect.setAttribute('height', pixel(Math.abs(endPoint.y - startPoint.y)));
+
+        if (endPoint.x - startPoint.x < 0) {
+          rect.setAttribute('x', pixel(endPoint.x));
+        } else {
+          rect.setAttribute('x', pixel(startPoint.x));
+        }
+
+        if (endPoint.y - startPoint.y < 0) {
+          rect.setAttribute('y', pixel(endPoint.y));
+        } else {
+          rect.setAttribute('y', pixel(startPoint.y));
+        }
+      }
+
+      this.svg.onmouseup = (ev)=>{
+        this.svg.onmousemove = null;
+        this.svg.onmouseup = null;
+        rect.remove();
+        this.markers.forEach(it=> it.unselect());
+        let selected = this.selectMarkers(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+        selected.forEach(it=>it.select());
+        this.selected = selected;
+        //selected.forEach()
+      }
+
+    }
+
     let r = this.svg.getAttribute('viewBox').split(' ');
     let rect = {
       left: Number.parseFloat(r[0]),
@@ -114,18 +173,15 @@ export class SView extends Control {
       height: Number.parseFloat(r[3])
     }
 
-    const pixel = (value:number)=>{
-      return value+'px';
-    }
     this.node.style.width = pixel(rect.width);
     this.node.style.height = pixel(rect.height);
 
     this.editables = [...this.node.querySelectorAll<SVGPathElement>('path')];
   }
 
-  addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number) => void) {
+  addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number, lastx:number, lasty:number) => void, onMoveEnd: (x: number, y: number, lastx:number, lasty:number) => void)  {
     let main = this.node.querySelector<SVGElement>('svg');
-    let marker = new SMarker(main, pathParent, this.node, px, py, color, onMove);
+    let marker = new SMarker(main, pathParent, this.node, px, py, color, onMove, onMoveEnd);
     this.markers.push(marker);
   }
 
@@ -133,11 +189,51 @@ export class SView extends Control {
     this.markers.forEach(it=>it.node.remove());
     this.markers = [];
   }
+
+  drawSelection(){
+    
+  }
+
+  selectMarkers(sx:number, sy:number, ex:number, ey:number){
+    const inRect = (sx:number, sy:number, ex:number, ey:number, px:number, py:number)=>{
+      return (
+        (px>sx &&
+        py>sy &&
+        px<ex &&
+        py<ey)
+      );
+    }
+
+    return this.markers.filter(marker=>{
+      return inRect(Math.min(sx, ex), Math.min(sy, ey), Math.max(sx, ex), Math.max(sy, ey), marker.x, marker.y);
+    });
+  }
 }
 
 class SMarker {
   private size:number = 50;
+
+  public _x:number;
+  onMove: (x: number, y: number, lx: number, ly: number) => void;
+  set x(value:number){
+    this._x = value;
+    this.node.setAttribute('cx', value.toString());
+  }
+  get x(){
+    return this._x;
+  }
+
+  public _y:number;
+  set y(value:number){
+    this._y = value;
+    this.node.setAttribute('cy', value.toString());
+  }
+  get y(){
+    return this._y;
+  }
+
   node: SVGCircleElement;
+  private color: string;
 
   constructor(
     mainNode: Node,
@@ -146,8 +242,11 @@ class SMarker {
     px: number,
     py: number,
     color: string,
-    onMove: (x: number, y: number) => void
+    onMove: (x: number, y: number, lx:number, ly:number) => void,
+    onMoveEnd: (x: number, y: number, lx:number, ly:number) => void
   ) {
+    this.onMove = onMove;
+    this.color = color;
     let circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     this.node = circle;
 
@@ -157,14 +256,17 @@ class SMarker {
     let pp = ptp.transformPoint(ppoint);
     let pm = ptm.transformPoint(pp);
 
-    circle.setAttribute('cx', pm.x.toString());
-    circle.setAttribute('cy', pm.y.toString());
+   // circle.setAttribute('cx', pm.x.toString());
+    //circle.setAttribute('cy', pm.y.toString());
+    this.x = pm.x;
+    this.y = pm.y;
     circle.setAttribute('r', (5).toString());
     circle.setAttribute('fill', color);
 
     let isDrag = false;
     let dragPoint:DOMPoint = null;
     circle.onmousedown = (ev) => {
+      ev.stopPropagation();
       isDrag = true;
       
 
@@ -175,24 +277,34 @@ class SMarker {
       dragPoint = new DOMPoint(ev.clientX - mcp.x, ev.clientY- mcp.y);
      // let dp = mtx.transformPoint(dragPoint);
       console.log(mtx);
-      
+      let lastx = this.x;
+      let lasty = this.y;
       
       dropNode.onmousemove = (ev) => {
         let cr = new DOMPoint(ev.clientX- dragPoint.x, ev.clientY- dragPoint.y);
         let lr = mtx.transformPoint(cr);
         let cx = lr.x 
-        let cy = lr.y ;
-        circle.setAttribute('cx', cx.toString());
-        circle.setAttribute('cy', cy.toString());
+        let cy = lr.y
+        //this.x = cx;
+        //this.y = cy;
         let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM()).inverse();
         let cxp = ptp.transformPoint(cr);
-        onMove(cxp.x, cxp.y);
+        onMove(cxp.x, cxp.y, lastx, lasty);
       }
 
       dropNode.onmouseup = (ev) => {
+        let cr = new DOMPoint(ev.clientX- dragPoint.x, ev.clientY- dragPoint.y);
+        let lr = mtx.transformPoint(cr);
+        let cx = lr.x 
+        let cy = lr.y
+        //this.x = cx;
+        //this.y = cy;
+        let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM()).inverse();
+        let cxp = ptp.transformPoint(cr);
         isDrag = false;
         dropNode.onmouseup = null;
         dropNode.onmousemove = null;
+        onMoveEnd(cxp.x, cxp.y, lastx, lasty);
       }
     }
     mainNode.appendChild(circle);
@@ -201,4 +313,16 @@ class SMarker {
   setSize(){
 
   }
+
+  select(){
+    this.node.setAttribute('fill', '#00f');
+  }
+
+  unselect(){
+    this.node.setAttribute('fill', this.color);
+  }
+}
+
+const pixel = (value:number)=>{
+  return value+'px';
 }
