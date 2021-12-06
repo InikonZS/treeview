@@ -71,11 +71,16 @@ export const tags = new Map<string, number>([
 
 function parseTagRecord(path:Array<string>, lastTag:string):[SPathTag, Array<string>]{
   let [tag, nextPath] = readTagName(path);
+  
+  if (tag == lastTag && lastTag == 'z' || 'Z'){
+    [tag, nextPath] = readTagName(trimToNumber(path));   
+  }
   if (!tag){
     tag = lastTag;
   }
+  
   let [args, nextPath1] = readArgs(nextPath, tags.get(tag)); 
-  console.log(tag, args);
+  //console.log(tag, args);
   return [{tag, args}, nextPath1];
 }
 
@@ -107,7 +112,7 @@ export function toAbsolute(data:SPath):SPath{
     }
     res1.push(rec);
     if (it.tag=='c'){
-      console.log(rec);
+      //console.log(rec);
       for (let i = 0; i< 3; i++){
         rec.args.push(it.args[0 + i*2]+lx);
         rec.args.push(it.args[1+ i*2]+ly);
@@ -120,7 +125,7 @@ export function toAbsolute(data:SPath):SPath{
         //
       }
     } else if (it.tag=='s'){
-      console.log(rec);
+      //console.log(rec);
       for (let i = 0; i< 2; i++){
         rec.args.push(it.args[0 + i*2]+lx);
         rec.args.push(it.args[1+ i*2]+ly);
@@ -134,7 +139,7 @@ export function toAbsolute(data:SPath):SPath{
       }
     }
     else if (it.tag=='l'){
-      console.log(rec);
+     // console.log(rec);
       for (let i = 0; i< 1; i++){
         rec.args.push(it.args[0 + i*2]+lx);
         rec.args.push(it.args[1+ i*2]+ly);
@@ -148,7 +153,7 @@ export function toAbsolute(data:SPath):SPath{
       }
     }
     else if (it.tag=='m'){
-      console.log(rec);
+     // console.log(rec);
       for (let i = 0; i< 1; i++){
         rec.args.push(it.args[0 + i*2]+lx);
         rec.args.push(it.args[1+ i*2]+ly);
@@ -160,7 +165,7 @@ export function toAbsolute(data:SPath):SPath{
       }
     }
     else if (it.tag=='h'){
-      console.log(rec);
+     // console.log(rec);
      // for (let i = 0; i< 1; i++){
         rec.args.push(it.args[0]+ly);
         ly = it.args[0]+ly;
@@ -174,7 +179,7 @@ export function toAbsolute(data:SPath):SPath{
       }
        
     } else if (it.tag == it.tag.toUpperCase()){
-      console.log(rec);
+  //    console.log(rec);
       for (let i = 0; i< tags.get(it.tag) / 2; i++){
         rec.args.push(it.args[0 + i*2]);
         rec.args.push(it.args[1+ i*2]);
