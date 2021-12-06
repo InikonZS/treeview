@@ -5,6 +5,7 @@ import {sv1, sv} from './imgs';
 
 export class SEditor extends Control{
   sview: SView = null;
+  selected: SVGPathElement = null;
 
   constructor(parentNode: HTMLElement) {
     super(parentNode, 'div', '');
@@ -37,46 +38,68 @@ export class SEditor extends Control{
     let sview = new SView(this.node, svgCode);
     this.sview = sview;
     sview.editables.forEach(editable=>{
-      let pathData = editable.getAttribute('d');
-      let res = parsePath(pathData);
-      let ab = toAbsolute(res);
-      ab.forEach(it=>{
-        let lx = 0;
-        let ly = 0;
-        for (let i = 0; i< tags.get(it.tag)/2; i++){
-          let ax:number = null;
-          let ay:number = null;
-          if (it.tag.toLowerCase() == 'z' ){
-    
-          } else 
-          if (it.tag.toLowerCase() == 'h' ){
-            ax = it.args[0];
-          } else 
+      editable.onmouseover=()=>{
+        editable.style.fill = "#222";
+      }
 
-          if (it.tag.toLowerCase() == 'v' ){
-            
-            ay = it.args[0]; 
-          } else {
-            ax = it.args[0 + i*2];
-            ay = it.args[1+ i*2]; 
-          }
-          
-          sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(it.tag)/2-1? 'green':'red', (x,y)=>{
-            it.args[0 + i*2] = x;
-            it.args[1 + i*2] = y;
-            editable.setAttribute('d', unParse(ab));
-          });
-          lx = it.args[0 + i*2];
-          ly = it.args[1 + i*2];
+      editable.onmouseout=()=>{
+        editable.style.fill = null;
+      }
+
+      editable.onclick=()=>{
+        if (this.selected != editable){
+          console.log(editable);
+          this.selectPath(editable);
         }
-      }); 
+      }
+      
     })
+  }
+
+  selectPath(editable:SVGPathElement){
+    this.selected = editable;
+    this.sview.cleanMarkers();
+    let pathData = editable.getAttribute('d');
+    let res = parsePath(pathData);
+    let ab = toAbsolute(res);
+    ab.forEach(it=>{
+      let lx = 0;
+      let ly = 0;
+      for (let i = 0; i< tags.get(it.tag)/2; i++){
+        let ax:number = null;
+        let ay:number = null;
+        if (it.tag.toLowerCase() == 'z' ){
+  
+        } else 
+        if (it.tag.toLowerCase() == 'h' ){
+          ax = it.args[0];
+        } else 
+
+        if (it.tag.toLowerCase() == 'v' ){
+          
+          ay = it.args[0]; 
+        } else {
+          ax = it.args[0 + i*2];
+          ay = it.args[1+ i*2]; 
+        }
+        
+        this.sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(it.tag)/2-1? 'green':'red', (x,y)=>{
+          it.args[0 + i*2] = x;
+          it.args[1 + i*2] = y;
+          editable.setAttribute('d', unParse(ab));
+        });
+        lx = it.args[0 + i*2];
+        ly = it.args[1 + i*2];
+      }
+    }); 
   }
 }
 
 export class SView extends Control {
   editables: SVGPathElement[];
   svg: SVGElement;
+  markers: Array<SMarker> = [];
+
   constructor(parentNode: HTMLElement, svgCode:string) {
     super(parentNode, 'div', '',);
 
@@ -103,11 +126,18 @@ export class SView extends Control {
   addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number) => void) {
     let main = this.node.querySelector<SVGElement>('svg');
     let marker = new SMarker(main, pathParent, this.node, px, py, color, onMove);
+    this.markers.push(marker);
+  }
+
+  cleanMarkers(){
+    this.markers.forEach(it=>it.node.remove());
+    this.markers = [];
   }
 }
 
 class SMarker {
   private size:number = 50;
+  node: SVGCircleElement;
 
   constructor(
     mainNode: Node,
@@ -119,13 +149,7 @@ class SMarker {
     onMove: (x: number, y: number) => void
   ) {
     let circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-
-   /* let mtp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM());
-    let ptmp = DOMMatrix.fromMatrix((mainNode as SVGGElement).getScreenCTM()).inverse();
-    let vec = new DOMPoint(10);
-    let vz = new DOMPoint(0);
-    let rv = mtp.transformPoint(vec);
-    let rvz = mtp.transformPoint(vz);*/
+    this.node = circle;
 
     let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM());
     let ptm = DOMMatrix.fromMatrix((mainNode as SVGGElement).getScreenCTM()).inverse();
