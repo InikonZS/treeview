@@ -57,6 +57,8 @@ export const tags = new Map<string, number>([
   ['m', 2],
   ['V', 1],
   ['H', 1],
+  ['v', 1],
+  ['h', 1],
   ['q', 4],
   ['c', 6],
   ['C', 6],
@@ -165,13 +167,22 @@ export function toAbsolute(data:SPath):SPath{
       }
     }
     else if (it.tag=='h'){
-     // console.log(rec);
-     // for (let i = 0; i< 1; i++){
-        rec.args.push(it.args[0]+ly);
-        ly = it.args[0]+ly;
-        //
-      //}
-    } else if (it.tag=='z' || it.tag=='Z'){
+        rec.args.push(it.args[0]+lx);
+        lx = it.args[0]+lx;
+    }
+    else if (it.tag=='v'){
+         rec.args.push(it.args[0]+ly);
+         ly = it.args[0]+ly;
+     } 
+     else if (it.tag=='H'){
+      rec.args.push(it.args[0]);
+      lx = it.args[0];
+  }
+  else if (it.tag=='V'){
+       rec.args.push(it.args[0]);
+       ly = it.args[0];
+   } 
+     else if (it.tag=='z' || it.tag=='Z'){
       if (!zUsed){
         lx = 256;
         ly = 224;
