@@ -7,6 +7,7 @@ import { pixel } from './utils';
 export class SEditor extends Control{
   sview: SView = null;
   selected: SVGPathElement = null;
+  editors: ISubPathView[] = [];
 
   constructor(parentNode: HTMLElement) {
     super(parentNode, 'div', '');
@@ -14,23 +15,30 @@ export class SEditor extends Control{
     fileInput.node.type = 'file';
     fileInput.node.accept = '.svg';
     fileInput.node.onchange = ()=>{
-      let file = fileInput.node.files[0];
-      
+      const file = fileInput.node.files[0];
       if (file){
-        let reader = new FileReader(); 
-        reader.readAsText(file, 'utf8');
-        reader.onload = res=>{
-          let sv = reader.result.toString();
-          this.loadSvg(sv);
-        }
+        this.loadSvgFromFile(file).then(res=>{
+          this.loadSvgFromCode(res);
+        });
       }
     }
     /*fetch('https://svgx.ru/svg/1296104.svg').then(res=>res.text()).then(sv=>{
       this.loadSvg(sv);
     })*/
-  }  
+  } 
+  
+  loadSvgFromFile(file:File):Promise<string>{ 
+    return new Promise((resolve)=>{
+      let reader = new FileReader(); 
+      reader.readAsText(file, 'utf8');
+      reader.onload = (res) => {
+        let sv = reader.result.toString();
+        resolve(sv);
+      }
+    });
+  }
 
-  loadSvg(svgCode:string){
+  loadSvgFromCode(svgCode:string){
     if (this.sview){
       this.sview.destroy();
       this.sview = null;
@@ -59,7 +67,7 @@ export class SEditor extends Control{
 
   selectPath(editable:SVGPathElement){
     this.selected = editable;
-    this.sview.cleanMarkers();
+    this.cleanPath();
     let pathData = editable.getAttribute('d');
     let res = parsePath(pathData);
     let ab = toAbsolute(res);
@@ -91,13 +99,25 @@ export class SEditor extends Control{
         default:
         subPathView = new SubPathView(editable, this.sview, it, editHandler);
       } 
+      if ( subPathView){
+        this.editors.push(subPathView);
+      }
     }); 
+  }
+
+  cleanPath(){
+    this.editors.forEach(it=> it.destroy());
+    this.editors = [];
   }
 }
 
-interface ISubPathView{}
+interface ISubPathView{
+  destroy: ()=>void;
+}
 
 class SubPathView implements ISubPathView{
+  markers: SMarker[] = [];
+
   constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
     let lx = 0;
     let ly = 0;
@@ -109,18 +129,26 @@ class SubPathView implements ISubPathView{
       let ax:number = data.args[0 + i*2];
       let ay:number = data.args[1 + i*2];
 
-      sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(data.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
+      let marker = new SMarker(sview.svg, editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(data.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
         nextData.args[0 + i*2] = x;
         nextData.args[1 + i*2] = y;
         onEdit(nextData);
       });
+      this.markers.push(marker);
+    
       lx = data.args[0 + i*2];
       ly = data.args[1 + i*2];
-    }  
+    }   
+  }
+
+  destroy(){
+    this.markers.forEach(it=>it.destroy());
+    this.markers = [];
   }
 }
 
 class SubPathViewH implements ISubPathView{
+  marker: SMarker;
   constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
     let nextData:SPathTag = {
       tag: data.tag,
@@ -129,14 +157,19 @@ class SubPathViewH implements ISubPathView{
 
     let ax:number = data.args[0];
     
-    sview.addPoint(editable.parentNode, ax, 0, "#f0f", (x,y, lastx, lasty)=>{
+    this.marker = new SMarker(sview.svg, editable.parentNode, ax, 0, '#f0f', (x,y, lastx, lasty)=>{
       nextData.args[0] = x;
       onEdit(nextData);
-    }); 
+    });
+  }
+
+  destroy(){
+    this.marker.destroy();
   }
 }
 
 class SubPathViewV implements ISubPathView{
+  marker: SMarker;
   constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
     let nextData:SPathTag = {
       tag: data.tag,
@@ -144,35 +177,39 @@ class SubPathViewV implements ISubPathView{
     }
     let ay:number = data.args[0];
 
-    sview.addPoint(editable.parentNode, 0, ay, '#0ff', (x,y, lastx, lasty)=>{
+    this.marker = new SMarker(sview.svg, editable.parentNode, 0, ay, '#0ff', (x,y, lastx, lasty)=>{
       nextData.args[0] = y;
       onEdit(nextData);
     });
+  }
+
+  destroy(){
+    this.marker.destroy();
   }
 }
 
 
 export class SView extends Control {
   editables: SVGPathElement[];
-  svg: SVGElement;
+  svg: SVGSVGElement;
   markers: Array<SMarker> = [];
   selected: Array<SMarker> = [];
 
   constructor(parentNode: HTMLElement, svgCode:string) {
     super(parentNode, 'div', '',);
 
-   this.node.innerHTML = svgCode;
+    this.node.innerHTML = svgCode;
 
-    this.svg = this.node.querySelector<SVGElement>('svg');
+    this.svg = this.node.querySelector<SVGSVGElement>('svg');
 
     this.svg.onmousedown = (ev)=>{
       const rect = new SRect(this.svg as SVGSVGElement, ev.clientX, ev.clientY);
 
-      this.svg.onmousemove = (ev)=>{
+      window.onmousemove = (ev:MouseEvent)=>{
         rect.resize(ev.clientX, ev.clientY);
       }
 
-      this.svg.onmouseup = (ev)=>{
+      window.onmouseup = (ev:MouseEvent)=>{
         this.svg.onmousemove = null;
         this.svg.onmouseup = null;
 
@@ -186,13 +223,14 @@ export class SView extends Control {
 
     }
 
-    let r = this.svg.getAttribute('viewBox').split(' ');
-    let rect = {
+    let rect = this.svg.viewBox.baseVal;
+    //this.svg.getAttribute('viewBox').split(' ');
+    /*let rect = {
       left: Number.parseFloat(r[0]),
       top: Number.parseFloat(r[1]),
       width: Number.parseFloat(r[2]),
       height: Number.parseFloat(r[3])
-    }
+    }*/
 
     this.node.style.width = pixel(rect.width);
     this.node.style.height = pixel(rect.height);
@@ -201,7 +239,7 @@ export class SView extends Control {
   }
 
   addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number, lastx:number, lasty:number) => void, onMoveEnd?: (x: number, y: number, lastx:number, lasty:number) => void)  {
-    let marker = new SMarker(this.svg, pathParent, this.node, px, py, color, onMove, onMoveEnd);
+    let marker = new SMarker(this.svg, pathParent, px, py, color, onMove, onMoveEnd);
     this.markers.push(marker);
   }
 
@@ -256,14 +294,14 @@ class SMarker {
   private color: string;
 
   constructor(
-    mainNode: Node,
+    mainNode: SVGSVGElement,
     parentNode: Node,
-    dropNode: HTMLElement,
+    //dropNode: HTMLElement,
     px: number,
     py: number,
     color: string,
     onMove: (x: number, y: number, lx:number, ly:number) => void,
-    onMoveEnd: (x: number, y: number, lx:number, ly:number) => void
+    onMoveEnd?: (x: number, y: number, lx:number, ly:number) => void
   ) {
     this.onMove = onMove;
     this.color = color;
@@ -271,7 +309,7 @@ class SMarker {
     this.node = circle;
 
     let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM());
-    let ptm = DOMMatrix.fromMatrix((mainNode as SVGGElement).getScreenCTM()).inverse();
+    let ptm = DOMMatrix.fromMatrix((mainNode).getScreenCTM()).inverse();
     let ppoint = new DOMPoint(px, py);
     let pp = ptp.transformPoint(ppoint);
     let pm = ptm.transformPoint(pp);
@@ -300,7 +338,7 @@ class SMarker {
       let lastx = this.x;
       let lasty = this.y;
       
-      dropNode.onmousemove = (ev) => {
+      mainNode.onmousemove = (ev) => {
         let cr = new DOMPoint(ev.clientX- dragPoint.x, ev.clientY- dragPoint.y);
         let lr = mtx.transformPoint(cr);
         let cx = lr.x 
@@ -312,7 +350,7 @@ class SMarker {
         onMove(cxp.x, cxp.y, lastx, lasty);
       }
 
-      dropNode.onmouseup = (ev) => {
+      mainNode.onmouseup = (ev) => {
         let cr = new DOMPoint(ev.clientX- dragPoint.x, ev.clientY- dragPoint.y);
         let lr = mtx.transformPoint(cr);
         let cx = lr.x 
@@ -322,9 +360,15 @@ class SMarker {
         let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM()).inverse();
         let cxp = ptp.transformPoint(cr);
         isDrag = false;
-        dropNode.onmouseup = null;
-        dropNode.onmousemove = null;
+        mainNode.onmouseup = null;
+        mainNode.onmousemove = null;
         onMoveEnd(cxp.x, cxp.y, lastx, lasty);
+      }
+
+      window.onmouseup = ()=>{
+        isDrag = false;
+        mainNode.onmouseup = null;
+        mainNode.onmousemove = null;  
       }
     }
     mainNode.appendChild(circle);
@@ -340,6 +384,10 @@ class SMarker {
 
   unselect(){
     this.node.setAttribute('fill', this.color);
+  }
+
+  destroy(){
+    this.node.remove();
   }
 }
 
