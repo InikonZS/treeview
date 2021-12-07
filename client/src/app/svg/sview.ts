@@ -22,9 +22,6 @@ export class SEditor extends Control{
         });
       }
     }
-    /*fetch('https://svgx.ru/svg/1296104.svg').then(res=>res.text()).then(sv=>{
-      this.loadSvg(sv);
-    })*/
   } 
   
   loadSvgFromFile(file:File):Promise<string>{ 
@@ -45,24 +42,13 @@ export class SEditor extends Control{
     }
 
     let sview = new SView(this.node, svgCode);
+
+    sview.onSelectPath = path => {
+      this.selectPath(path);
+    };
+
     this.sview = sview;
-    sview.editables.forEach(editable=>{
-      editable.onmouseover=()=>{
-        editable.style.fill = "#222";
-      }
 
-      editable.onmouseout=()=>{
-        editable.style.fill = null;
-      }
-
-      editable.onclick=()=>{
-        if (this.selected != editable){
-          console.log(editable);
-          this.selectPath(editable);
-        }
-      }
-      
-    })
   }
 
   selectPath(editable:SVGPathElement){
@@ -76,32 +62,16 @@ export class SEditor extends Control{
         ab[i] = data;
         editable.setAttribute('d', unParse(ab));
       }
-      let subPathView:ISubPathView = null;
-      switch (it.tag){
-        case 'h': 
-        subPathView = new SubPathViewH(editable, this.sview, it, editHandler);
-        break;
-        case 'H': 
-        subPathView = new SubPathViewH(editable, this.sview, it, editHandler);
-        break;
-        case 'v': 
-        subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
-        break;
-        case 'V': 
-        subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
-        break;
-        case 'z': 
-        //subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
-        break;
-        case 'Z': 
-        //subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
-        break;
-        default:
-        subPathView = new SubPathView(editable, this.sview, it, editHandler);
-      } 
-      if ( subPathView){
-        this.editors.push(subPathView);
+      
+      let pathViews:Record<string, ISubPathViewClass> = {
+        'h': SubPathViewH,
+        'v': SubPathViewV,
+        'z': SubPathViewZ
       }
+      const ViewClass = pathViews[it.tag.toLowerCase()] || SubPathView;
+      const subPathView = new ViewClass(editable, this.sview, it, editHandler);
+      this.editors.push(subPathView);
+      
     }); 
   }
 
@@ -113,6 +83,10 @@ export class SEditor extends Control{
 
 interface ISubPathView{
   destroy: ()=>void;
+}
+
+interface ISubPathViewClass{
+  new (editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void): ISubPathView;
 }
 
 class SubPathView implements ISubPathView{
@@ -188,12 +162,32 @@ class SubPathViewV implements ISubPathView{
   }
 }
 
+class SubPathViewZ implements ISubPathView{
+  marker: SMarker;
+  constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
+    let nextData:SPathTag = {
+      tag: data.tag,
+      args: [...data.args]
+    }
+
+    this.marker = new SMarker(sview.svg, editable.parentNode, 0, 0, '#ff0', (x,y, lastx, lasty)=>{
+      onEdit(nextData);
+    });
+  }
+
+  destroy(){
+    this.marker.destroy();
+  }
+}
+
 
 export class SView extends Control {
   editables: SVGPathElement[];
   svg: SVGSVGElement;
   markers: Array<SMarker> = [];
   selected: Array<SMarker> = [];
+  selectedPath: SVGPathElement = null;
+  onSelectPath: (path:SVGPathElement)=>void;
 
   constructor(parentNode: HTMLElement, svgCode:string) {
     super(parentNode, 'div', '',);
@@ -236,6 +230,23 @@ export class SView extends Control {
     this.node.style.height = pixel(rect.height);
 
     this.editables = [...this.node.querySelectorAll<SVGPathElement>('path')];
+
+    this.editables.forEach(editable=>{
+      editable.onmouseover=()=>{
+        editable.style.fill = "#222";
+      }
+
+      editable.onmouseout=()=>{
+        editable.style.fill = null;
+      }
+
+      editable.onclick=()=>{
+        if (this.selectedPath != editable){
+          this.onSelectPath(editable);
+        }
+      }
+      
+    })
   }
 
   addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number, lastx:number, lasty:number) => void, onMoveEnd?: (x: number, y: number, lastx:number, lasty:number) => void)  {
