@@ -1,4 +1,4 @@
-interface SPathTag{
+export interface SPathTag{
   tag:string;
   args:Array<number>;
 }

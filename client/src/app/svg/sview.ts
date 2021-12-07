@@ -1,5 +1,5 @@
 import Control from '../../common/control';
-import { parsePath, tags, toAbsolute, unParse } from './pathParser';
+import { parsePath, SPathTag, tags, toAbsolute, unParse } from './pathParser';
 import {SRect} from './srect';
 import {sv1, sv} from './imgs';
 import { pixel } from './utils';
@@ -63,46 +63,133 @@ export class SEditor extends Control{
     let pathData = editable.getAttribute('d');
     let res = parsePath(pathData);
     let ab = toAbsolute(res);
-    ab.forEach(it=>{
-      let lx = 0;
-      let ly = 0;
-      for (let i = 0; i< tags.get(it.tag)/2; i++){
-        let ax:number = null;
-        let ay:number = null;
-        if (it.tag.toLowerCase() == 'z' ){
-  
-        } else 
-        if (it.tag.toLowerCase() == 'h' ){
-          ax = it.args[0];
-        } else 
-
-        if (it.tag.toLowerCase() == 'v' ){
-          
-          ay = it.args[0]; 
-        } else {
-          ax = it.args[0 + i*2];
-          ay = it.args[1+ i*2]; 
-        }
-        
-        this.sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(it.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
-          it.args[0 + i*2] = x;
-          it.args[1 + i*2] = y;
-          
-          editable.setAttribute('d', unParse(ab));
-        },
-        (x,y, lastx, lasty)=>{
-          console.log(x,y, lastx, lasty);
-          this.sview.selected.forEach(point=>{
-            point.onMove(point.x - lastx + x, point.y - lasty + y, point.x, point.y);
-            point.x = point.x - lastx + x;
-            point.y = point.y - lasty + y;
-            
-          });
-        });
-        lx = it.args[0 + i*2];
-        ly = it.args[1 + i*2];
+    ab.forEach((it, i)=>{
+      const editHandler = (data:SPathTag)=>{
+        ab[i] = data;
+        editable.setAttribute('d', unParse(ab));
       }
+      let subPathView:ISubPathView = null;
+      switch (it.tag){
+        case 'h': 
+        subPathView = new SubPathViewH(editable, this.sview, it, editHandler);
+        break;
+        case 'H': 
+        subPathView = new SubPathViewH(editable, this.sview, it, editHandler);
+        break;
+        case 'v': 
+        subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
+        break;
+        case 'V': 
+        subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
+        break;
+        case 'z': 
+        //subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
+        break;
+        case 'Z': 
+        //subPathView = new SubPathViewV(editable, this.sview, it, editHandler);
+        break;
+        default:
+        subPathView = new SubPathView(editable, this.sview, it, editHandler);
+      } 
     }); 
+  }
+}
+
+interface ISubPathView{}
+
+class SubPathView implements ISubPathView{
+  constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
+    let lx = 0;
+    let ly = 0;
+    let nextData:SPathTag = {
+      tag: data.tag,
+      args: [...data.args]
+    }
+    for (let i = 0; i< tags.get(data.tag)/2; i++){
+      let ax:number = data.args[0 + i*2];
+      let ay:number = data.args[1+ i*2];
+
+      sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(data.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
+        nextData.args[0 + i*2] = x;
+        nextData.args[1 + i*2] = y;
+        onEdit(nextData);
+      },
+      (x,y, lastx, lasty)=>{
+       /* console.log(x,y, lastx, lasty);
+        sview.selected.forEach(point=>{
+          point.onMove(point.x - lastx + x, point.y - lasty + y, point.x, point.y);
+          point.x = point.x - lastx + x;
+          point.y = point.y - lasty + y;
+          
+        });*/
+      });
+      lx = data.args[0 + i*2];
+      ly = data.args[1 + i*2];
+    }  
+  }
+}
+
+class SubPathViewH implements ISubPathView{
+  constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
+    let lx = 0;
+    let ly = 0;
+    let nextData:SPathTag = {
+      tag: data.tag,
+      args: [...data.args]
+    }
+    for (let i = 0; i< tags.get(data.tag)/2; i++){
+      let ax:number = data.args[0];
+      let ay:number = null;
+      
+      sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(data.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
+        nextData.args[0 + i*2] = x;
+        nextData.args[1 + i*2] = y;
+        onEdit(nextData);
+      },
+      (x,y, lastx, lasty)=>{
+       /* console.log(x,y, lastx, lasty);
+        sview.selected.forEach(point=>{
+          point.onMove(point.x - lastx + x, point.y - lasty + y, point.x, point.y);
+          point.x = point.x - lastx + x;
+          point.y = point.y - lasty + y;
+          
+        });*/
+      });
+      lx = data.args[0 + i*2];
+      ly = data.args[1 + i*2];
+    }  
+  }
+}
+
+class SubPathViewV implements ISubPathView{
+  constructor(editable:SVGPathElement, sview:SView, data:SPathTag, onEdit:(data:SPathTag)=>void){
+    let lx = 0;
+    let ly = 0;
+    let nextData:SPathTag = {
+      tag: data.tag,
+      args: [...data.args]
+    }
+    for (let i = 0; i< tags.get(data.tag)/2; i++){
+      let ax:number = data.args[0];
+      let ay:number = null;
+      
+      sview.addPoint(editable.parentNode, ax ?? lx, ay ?? ly, i==tags.get(data.tag)/2-1? 'green':'red', (x,y, lastx, lasty)=>{
+        nextData.args[0 + i*2] = x;
+        nextData.args[1 + i*2] = y;
+        onEdit(nextData);
+      },
+      (x,y, lastx, lasty)=>{
+       /* console.log(x,y, lastx, lasty);
+        sview.selected.forEach(point=>{
+          point.onMove(point.x - lastx + x, point.y - lasty + y, point.x, point.y);
+          point.x = point.x - lastx + x;
+          point.y = point.y - lasty + y;
+          
+        });*/
+      });
+      lx = data.args[0 + i*2];
+      ly = data.args[1 + i*2];
+    }  
   }
 }
 
@@ -156,8 +243,7 @@ export class SView extends Control {
   }
 
   addPoint(pathParent:Node, px: number, py: number, color: string, onMove: (x: number, y: number, lastx:number, lasty:number) => void, onMoveEnd: (x: number, y: number, lastx:number, lasty:number) => void)  {
-    let main = this.node.querySelector<SVGElement>('svg');
-    let marker = new SMarker(main, pathParent, this.node, px, py, color, onMove, onMoveEnd);
+    let marker = new SMarker(this.svg, pathParent, this.node, px, py, color, onMove, onMoveEnd);
     this.markers.push(marker);
   }
 
@@ -261,8 +347,8 @@ class SMarker {
         let lr = mtx.transformPoint(cr);
         let cx = lr.x 
         let cy = lr.y
-        //this.x = cx;
-        //this.y = cy;
+        this.x = cx;
+        this.y = cy;
         let ptp = DOMMatrix.fromMatrix((parentNode as SVGGElement).getScreenCTM()).inverse();
         let cxp = ptp.transformPoint(cr);
         onMove(cxp.x, cxp.y, lastx, lasty);
